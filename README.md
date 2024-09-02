@@ -66,12 +66,14 @@ Other than default mode of operation, there may exist other ways program can pro
    
 3. **File Naming Convention:**  
    Name your files using underscores to separate each key parameter, as shown below:
-   JNC Heights 01-07-24_Phase Shifter_**Cell Gap_50mkm_15r_S11**_LOGM_**0V**_2024-07-02_12-47-17.xlsx
+   
+   JNC Heights 01-07-24_Phase Shifter_==**Cell Gap_50mkm_15r_S11**==_LOGM_==**0V**==_2024-07-02_12-47-17.xlsx
+   
    The program will interpret this file name to identify the variables: positions of Cell Gap and 50mkm will be set as variable parameter name and value respectively, S11 and 0V will be set as fixed parameters, 15r will be set as experiment number.
 
-4. **Launch Program:**  
+5. **Launch Program:**  
    This program operates in Python code language and will require you to install this language as well as all required libraries: pandas, matplotlib and numpy. You will be prompted to input source folder as well as given an option to perform setup. You can set a program to ignore first and second fixed variables or cancel drawing of difference plots.
 
-5. **View Results:**  
+6. **View Results:**  
    The program will display the plots, and you can save them manually. You can also copy extra R² values from the command prompt.
 
