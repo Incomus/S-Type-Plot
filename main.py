@@ -3,20 +3,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
 
-def summarize_folders(main_folder_path):
-    variable_count, variation_count, experiment_count = 0, 0, 0
-    main_folder = Path(main_folder_path)
+def summarize_folders(legacy):
+    while True:
+        main_folder_path = input("Input path to the main folder:\n")
+        main_folder = Path(main_folder_path)
+        if main_folder.exists() and main_folder.is_dir():  # Check if the path exists and is a directory
+            break  # Break the loop if the input is valid
+        else:
+            print(f"'{main_folder_path}' is not a valid directory. Please try again.")
+    if legacy == 'y':
+        variable_count, variation_count, experiment_count = 0, 0, 0
+        for param_folder in main_folder.iterdir():
+            if param_folder.is_dir():
+                variable_count += 1
+                for variation_folder in param_folder.iterdir():
+                    if variation_folder.is_dir():
+                        variation_count += 1
+                        experiment_count += sum(1 for _ in variation_folder.glob("*.xlsx"))
     
-    for param_folder in main_folder.iterdir():
-        if param_folder.is_dir():
-            variable_count += 1
-            for variation_folder in param_folder.iterdir():
-                if variation_folder.is_dir():
-                    variation_count += 1
-                    experiment_count += sum(1 for _ in variation_folder.glob("*.xlsx"))
-    
-    print(f'Found {variable_count} variable parameters, {variation_count} variable variations, {experiment_count} experiments')
+        print(f'Found {variable_count} variable parameters, {variation_count} variable variations, {experiment_count} experiments')
+    else:
+        experiment_count += sum(1 for _ in main_folder.glob("*.xlsx"))
+        print(f'Found {experiment_count} experiments')
+    input('Press Enter to continue\n')
+    return main_folder_path
 
 def choose(text, *options):
     options = list(options)  # Convert the tuple to a list for easier handling
@@ -27,57 +39,77 @@ def choose(text, *options):
     
 # Prompt for settings
 def get_user_setup():
-    if choose('Choose operation:\n1 - Default\n2 - Phase response time', '1', '2') == '1':
-        if choose('Change default settings?', 'y', 'n') == 'y':
-            ignore_primary = choose('Ignore first variable?', 'y', 'n')
-            ignore_secondary = choose('Ignore second variable?', 'y', 'n')
+    def_state = choose('Choose operation:\n1 - Default\n2 - Phase response time', '1', '2')
+    
+    if choose('Change default settings?', 'y', 'n') == 'y':
+        legacy = choose('Use legacy file processing?', 'y', 'n')
+        ignore_primary = choose('Ignore first variable?', 'y', 'n') if def_state == '1' else 'n'
+        ignore_secondary = choose('Ignore second variable?', 'y', 'n') if def_state == '1' else 'n'
+        if def_state == '1':
             ignore_diff = choose('Ignore difference?', 'y', 'n') if ignore_secondary == 'n' else 'y'
-            def_state = '1'
         else:
-            def_state, ignore_primary, ignore_secondary, ignore_diff = '1', 'n', 'n', 'n'
+            ignore_diff = 'n'
     else:
-        def_state, ignore_primary, ignore_secondary, ignore_diff = '2', 'n', 'n', 'n'
-    return def_state, ignore_primary, ignore_secondary, ignore_diff
+        def_state, ignore_primary, ignore_secondary, ignore_diff, legacy = def_state, 'n', 'n', 'n', 'n'
+    return def_state, ignore_primary, ignore_secondary, ignore_diff, legacy
 
-def process_files(main_folder_path, def_state, ignore_primary, ignore_secondary):
+def process_files(main_folder_path, def_state, ignore_primary, ignore_secondary, legacy):
     data, failed_files = [], []
     main_folder = Path(main_folder_path)
     count = 0
-    for param_folder in main_folder.iterdir():
-        for variation_folder in param_folder.iterdir():
-            if variation_folder.is_dir():
-                for file in variation_folder.glob("*.xlsx"):
-                    try:
-                        df = pd.read_excel(file)
-                        df.columns = df.columns.str.lower().str.replace(" ", "_")
-                        if def_state == '2':
-                            file = file.stem.replace("Response_Time", "Response Time").replace("TFall_", "TFall ").replace("TRise_", "TRise ")
-                            df = df.iloc[:, 1:3]
-                        else:
-                            file = file.stem
-                            df = df.iloc[:, :2]  # Keep only first two columns
+    if legacy == 'y':
+        for param_folder in main_folder.iterdir():
+            for variation_folder in param_folder.iterdir():
+                if variation_folder.is_dir():
+                    for file in variation_folder.glob("*.xlsx"):
+                        try:
+                            df = pd.read_excel(file)
+                            df.columns = df.columns.str.lower().str.replace(" ", "_")
+                            if def_state == '2':
+                                file = file.stem.replace("Response_Time", "Response Time").replace("TFall_", "TFall ").replace("TRise_", "TRise ")
+                                df = df.iloc[:, 1:3]
+                            else:
+                                file = file.stem
+                                df = df.iloc[:, :2]  # Keep only first two columns
+                            variables = file.split('_')
+                            for i, var in enumerate(variables):
+                                df[f'variable{i+1}'] = var
 
-                        #print('1')
-                        #print(file)
-                        #print('2')
-                        #print(file)
-                        variables = file.split('_')
-                        for i, var in enumerate(variables):
-                            df[f'variable{i+1}'] = var
+                            df['id'] = count
+                            count += 1
+                            df['main_parameter'] = variation_folder.name
+                            df['param_name'] = param_folder.name
+                            data.append(df)
+                        except Exception as e:
+                            failed_files.append((file, str(e)))
+    else:
+        for file in main_folder.glob("*.xlsx"):
+            try:
+                df = pd.read_excel(file)
+                df.columns = df.columns.str.lower().str.replace(" ", "_")
+                if def_state == '2':
+                    file = file.stem.replace("Response_Time", "Response Time").replace("TFall_", "TFall ").replace("TRise_", "TRise ")
+                    df = df.iloc[:, 1:3]
+                else:
+                    file = file.stem
+                    df = df.iloc[:, :2]  # Keep only first two columns
+                variables = file.split('_')
+                for i, var in enumerate(variables):
+                    df[f'variable{i+1}'] = var
 
-                        df['id'] = count
-                        count += 1
-                        df['main_parameter'] = variation_folder.name
-                        df['param_name'] = param_folder.name
-                        data.append(df)
-                    except Exception as e:
-                        failed_files.append((file, str(e)))
-
+                df['id'] = count
+                count += 1
+                data.append(df)
+            except Exception as e:
+                failed_files.append((file, str(e)))
     if data:
         final_df = pd.concat(data, ignore_index=True)
-        #print(final_df.columns)
-        #print(final_df)
-        final_df.columns = ['x', 'y', 'name', 'type', 'exp_n', 'primary', 'measurable', 'secondary', 'date', 'time', 'id', 'main_parameter', 'param_name']
+        if legacy == 'y':
+            print(final_df.head())
+            final_df.columns = ['x', 'y', 'name', 'type', 'exp_n', 'primary', 'measurable', 'secondary', 'date', 'time', 'id', 'main_parameter', 'param_name']
+        else:
+            final_df.columns = ['x', 'y', 'name', 'type', 'param_name', 'main_parameter', 'exp_n', 'primary', 'measurable', 'secondary', 'date', 'time', 'id']
+            final_df = final_df.reindex(columns = ['x', 'y', 'id', 'exp_n', 'param_name', 'main_parameter', 'primary', 'secondary', 'name', 'measurable', 'date', 'time', 'type'])
         final_df.drop(columns=['name', 'type', 'measurable', 'date', 'time'], inplace=True)
     else:
         print("No valid data found.")
@@ -107,8 +139,8 @@ def calculate_r2(final_df, ignore_primary, ignore_secondary, ignore_diff):
                 grouped = filtered_df.groupby(['param_name', 'main_parameter', 'primary', 'secondary', 'x'])['y'].mean().reset_index()
                 grouped.rename(columns={'y': 'avg'}, inplace=True)
 
-                for exp in filtered_df['exp_n'].unique():
-                    exp_df = filtered_df[filtered_df['exp_n'] == exp].reset_index(drop=True)
+                for id in filtered_df['id'].unique():
+                    exp_df = filtered_df[filtered_df['id'] == id].reset_index(drop=True)
 
                     # Merge exp_df with grouped by matching on 'param_name' and 'x'
                     exp_merged = pd.merge(exp_df, grouped, on=['param_name', 'main_parameter', 'primary', 'secondary', 'x'], how='left')
@@ -121,9 +153,9 @@ def calculate_r2(final_df, ignore_primary, ignore_secondary, ignore_diff):
                     
                     # Update final_df with the R² value
                     final_df.loc[(final_df['primary'] == primary) & (final_df['secondary'] == secondary) & 
-                                 (final_df['exp_n'] == exp) & (final_df['main_parameter'] == main_parameter), 'R2'] = r2_value
+                                 (final_df['id'] == id) & (final_df['main_parameter'] == main_parameter), 'R2'] = r2_value
                     final_df.loc[(final_df['primary'] == primary) & (final_df['secondary'] == secondary) & 
-                                 (final_df['exp_n'] == exp) & (final_df['main_parameter'] == main_parameter), 'avg_y'] = exp_merged['y'].mean()
+                                 (final_df['id'] == id) & (final_df['main_parameter'] == main_parameter), 'avg_y'] = exp_merged['y'].mean()
     return final_df
         
 def final_plot(final_df):
@@ -300,7 +332,7 @@ def calculate_t(final_df):
     final_df = final_df.reindex(columns = ['id', 'exp_n', 'main_parameter', 'time_type', 'time', 'phase'])
     print('\nMain parameter: ' + param_name)
     for type in final_df['time_type'].unique():
-        print(final_df[final_df['time_type'] == type])
+        print(final_df[final_df['time_type'] == type].reset_index(drop=True))
         print()
 
 # Main execution
@@ -308,30 +340,34 @@ if __name__ == "__main__":
     # Instructions for creating folder structure and adding test data
     print("""
     How to:
-    1. Create a folder with the parameter name you want to test.
-    2. Inside that folder, create subfolders for each variation of the parameter (e.g., gap with 50, 75, and 100 μm).
-    3. Place the WNA Excel test data for S11/S12 (y) in the respective folders.
-    4. The program expects filenames in the following format, where each part is separated by an underscore:
-       'JNC Heights 01-07-24_Phase Shifter_15 r_S11_y_0V_2024-07-02_12-47-17'
-       This format is interpreted as: name (not used), type (not used), experiment number, primary, measurable, secondary, date (not used), time (not used).
+    1. Create a folder to store your data.
+    2. Place Excel experiment data in.
+    3. Input path to that folder, e.g. 'C:\\folder\\data subfolder'
+    4. The program expects filenames in the following example format, where each part is separated by an underscore:
+       'JNC Heights 01-07-24_Phase Shifter_Cell Gap_50mkm_15 r_S11_LOGM_0V_2024-07-02_12-47-17'
+       This format is interpreted as: name (not used), type (not used), variable parameter name, variable parameter value, 
+       experiment number, first fixed parameter, measurable (not used), second fixed parameter, date (not used), time (not used).
        
     """)
     
-    main_folder_path = input("Input path to the main folder:\n")
-    summarize_folders(main_folder_path)
-    def_state, ignore_primary, ignore_secondary, ignore_diff = get_user_setup()
+    try:
+        def_state, ignore_primary, ignore_secondary, ignore_diff, legacy = get_user_setup()
+        main_folder_path = summarize_folders(legacy)
 
-    final_df, failed_files = process_files(main_folder_path, def_state, ignore_primary, ignore_secondary)
-    if failed_files:
-        print("Failed to process the following files:")
-        for file, error in failed_files:
-            print(f"{file}: {error}")
+        final_df, failed_files = process_files(main_folder_path, def_state, ignore_primary, ignore_secondary, legacy)
+        if failed_files:
+            print("Failed to process the following files:")
+            for file, error in failed_files:
+                print(f"{file}: {error}")
+        
+        for param_name in final_df['param_name'].unique():
+            final_df_0 = final_df[final_df['param_name'] == param_name].reset_index(drop=True)
+            if def_state == '1':
+                    final_df_0 = calculate_r2(final_df_0, ignore_primary, ignore_secondary, ignore_diff)
+                    final_plot(final_df_0)
+            else:
+                calculate_t(final_df_0)
     
-    for param_name in final_df['param_name'].unique():
-        final_df_0 = final_df[final_df['param_name'] == param_name].reset_index(drop=True)
-        if def_state == '1':
-                final_df_0 = calculate_r2(final_df_0, ignore_primary, ignore_secondary, ignore_diff)
-                final_plot(final_df_0)
-        else:
-            calculate_t(final_df_0)
+    except Exception as e:
+        print(f"Error: {e}\nType: {type(e).__name__}\n")
     input("Press Enter to exit\n")
