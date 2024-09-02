@@ -67,7 +67,7 @@ Other than default mode of operation, there may exist other ways program can pro
 3. **File Naming Convention:**  
    Name your files using underscores to separate each key parameter, as shown below:
    
-   JNC Heights 01-07-24_Phase Shifter_**Cell Gap_50mkm_15r_S11**__LOGM__**0V**_2024-07-02_12-47-17.xlsx
+   JNC Heights 01-07-24_Phase Shifter_**Cell Gap_50mkm_15r_S11**_ LOGM _**0V**_2024-07-02_12-47-17.xlsx
    
    The program will interpret this file name to identify the variables: positions of Cell Gap and 50mkm will be set as variable parameter name and value respectively, S11 and 0V will be set as fixed parameters, 15r will be set as experiment number.
 
