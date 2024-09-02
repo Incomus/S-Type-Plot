@@ -14,7 +14,9 @@ This program processes organized experimental data, where each folder represents
 
 ### R² Calculation Formulas:
 R² = 1 - (SSres / SStot) 
+
 SSres = Σ(y_reg - y_i)² 
+
 SStot = Σ(y_i - y_mean)²
 
 The program compares the actual test results (y_i) to the regression line (y_reg) to calculate R².
