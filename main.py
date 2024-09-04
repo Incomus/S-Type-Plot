@@ -104,8 +104,9 @@ def process_files(main_folder_path, def_state, ignore_primary, ignore_secondary,
                 failed_files.append((file, str(e)))
     if data:
         final_df = pd.concat(data, ignore_index=True)
+        measurable = final_df.columns[1]
+        values = final_df.columns[0]
         if legacy == 'y':
-            print(final_df.head())
             final_df.columns = ['x', 'y', 'name', 'type', 'exp_n', 'primary', 'measurable', 'secondary', 'date', 'time', 'id', 'main_parameter', 'param_name']
         else:
             final_df.columns = ['x', 'y', 'name', 'type', 'param_name', 'main_parameter', 'exp_n', 'primary', 'measurable', 'secondary', 'date', 'time', 'id']
@@ -120,7 +121,7 @@ def process_files(main_folder_path, def_state, ignore_primary, ignore_secondary,
     if ignore_secondary == 'y':
         final_df['secondary'] = ''
     
-    return final_df, failed_files
+    return final_df, failed_files, measurable, values
 
 def calculate_r2(final_df, ignore_primary, ignore_secondary, ignore_diff):
     if final_df.empty:
@@ -158,7 +159,7 @@ def calculate_r2(final_df, ignore_primary, ignore_secondary, ignore_diff):
                                  (final_df['id'] == id) & (final_df['main_parameter'] == main_parameter), 'avg_y'] = exp_merged['y'].mean()
     return final_df
         
-def final_plot(final_df):
+def final_plot(final_df, measurable, values):
     unique_primarys = final_df['primary'].unique()
     unique_secondarys = final_df['secondary'].unique()
     param_name = final_df['param_name'][0]
@@ -167,8 +168,6 @@ def final_plot(final_df):
     grouped = grouped.rename(columns={'y': 'avg_y'})
     
     # Define the grid size for subplots based on the number of unique primary and secondary combinations
-    measurable = final_df.columns[1]
-    values = final_df.columns[0]
     n_rows = len(unique_primarys)
     n_cols = len(unique_secondarys) + 1
     if len(unique_secondarys) == 1:
@@ -198,6 +197,8 @@ def final_plot(final_df):
             #print(s_idx, v_idx)
             #print(axes)
             ax = axes[s_idx, v_idx]  # Access the subplot in the column for the current secondary and row for primary
+            ax.xaxis.set_label_coords(0.5, -0.1)
+            ax.yaxis.set_label_coords(-0.1, 0.5)
             param_legend = 'R2av:'
             for param in main_parameters:
                 r2_mean = final_df.loc[
@@ -206,8 +207,8 @@ def final_plot(final_df):
                     (final_df['main_parameter'] == param),
                     ['R2']
                 ].mean()
-                r2_mean = round(pd.to_numeric(r2_mean.values[0]), 3)
-                param_legend += str(param) + '=' + str(r2_mean) + ';'
+                r2_mean = pd.to_numeric(r2_mean.values[0])
+                param_legend += str(param) + '=' + f"{r2_mean:.2f}" + ';'
                 param_df = filtered_df[filtered_df['main_parameter'] == param]
                 ax.plot(param_df['x'], param_df['avg_y'], label=f'{param}')
             
@@ -236,6 +237,8 @@ def final_plot(final_df):
         for s_idx, primary in enumerate(unique_primarys):
             primary_df = secondary_diff[secondary_diff['primary'] == primary]
             ax = axes[s_idx, -1]  # Access the last column in the row
+            ax.xaxis.set_label_coords(0.5, -0.1)
+            ax.yaxis.set_label_coords(-0.1, 0.5)
             
             for param in main_parameters:
                 param_df = primary_df[primary_df['main_parameter'] == param]
@@ -259,7 +262,9 @@ def final_plot(final_df):
     # Display R² summary
     r2_summary = final_df.drop(columns=['x', 'y']).drop_duplicates().reset_index(drop=True)
     r2_summary['R2'] = pd.to_numeric(r2_summary['R2'], errors='coerce')
-    r2_summary['R2'] = round(r2_summary['R2'], 3)
+    r2_summary['R2'] = r2_summary['R2'].apply(lambda x: f"{x:.2f}")
+    r2_summary['avg_y'] = r2_summary['avg_y'].apply(lambda x: f"{x:.2f}")
+    final_df = final_df.rename(columns={'avg_y': f'avg_{measurable}'})
     r2_summary = r2_summary.sort_values(by=['main_parameter', 'primary', 'secondary', 'exp_n']).reset_index(drop=True)
     print('\nMain parameter: ' + param_name)
     print(r2_summary)
@@ -354,7 +359,7 @@ if __name__ == "__main__":
         def_state, ignore_primary, ignore_secondary, ignore_diff, legacy = get_user_setup()
         main_folder_path = summarize_folders(legacy)
 
-        final_df, failed_files = process_files(main_folder_path, def_state, ignore_primary, ignore_secondary, legacy)
+        final_df, failed_files, measurable, values = process_files(main_folder_path, def_state, ignore_primary, ignore_secondary, legacy)
         if failed_files:
             print("Failed to process the following files:")
             for file, error in failed_files:
@@ -364,10 +369,11 @@ if __name__ == "__main__":
             final_df_0 = final_df[final_df['param_name'] == param_name].reset_index(drop=True)
             if def_state == '1':
                     final_df_0 = calculate_r2(final_df_0, ignore_primary, ignore_secondary, ignore_diff)
-                    final_plot(final_df_0)
+                    final_plot(final_df_0, measurable, values)
             else:
                 calculate_t(final_df_0)
     
     except Exception as e:
         print(f"Error: {e}\nType: {type(e).__name__}\n")
+        traceback.print_exc()
     input("Press Enter to exit\n")
