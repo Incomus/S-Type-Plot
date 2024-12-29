@@ -56,7 +56,7 @@ The program compares the actual test results (y_i) to the regression line (y_reg
 ### Additional Functionality
 Other than default mode of operation, there may exist other ways program can processes data. Currently, it has an additional function to process phase change data to calculate response time, specific for VNA testing. That mode of operation receives Excel files and outputs a table, containing response time and maximum phase.
 
-Another mode of operation involves calculating time of fall foy hydraulic system.
+Another mode of operation involves calculating time of fall for hydraulic system and can be accessed by changing default setting of phase time response data processing to 1. It receives VNA phase change data with hydraulic knock present.
 
 ## How to Use the Program
 
