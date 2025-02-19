@@ -186,6 +186,8 @@ def process_files(main_folder_path, def_state):
             df = pd.read_excel(file)
             file = file.stem
             file = file.replace("_Gleb_", " Gleb ")
+            file = file.replace("Second_60s_", "")
+            file = re.sub(r'PS.*?GOLAN', 'GOLAN', file)
             if def_state == '2':
                 file = file.replace("Response_Time", "Response Time").replace("TFall_", "TFall ").replace("TRise_", "TRise ")
                 df = df.iloc[:, 1:3]
@@ -202,7 +204,8 @@ def process_files(main_folder_path, def_state):
             variables = file.split('_')
             for i, var in enumerate(variables):
                 df[f'variable{i+1}'] = var
-
+            #print(file)
+            #print(len(variables))
             df['id'] = count
             count += 1
             data.append(df)
@@ -696,6 +699,7 @@ def calculate_t(df, type):
         
         
     else:
+        sheet_names = []
         unique_params = df['main_parameter'].unique()
         unique_secondarys = df['secondary'].unique()
 
@@ -713,7 +717,7 @@ def calculate_t(df, type):
                     y_max_idx = exp_df['y'].abs().idxmax()
                     y_max = exp_df['y'].iloc[y_max_idx]
                     
-                    y_10 = 0.1 * y_max
+                    y_10 = 0.05 * y_max
                     y_90 = 0.9 * y_max
                         
                     row_10 = exp_df.iloc[(exp_df['y'] - y_10).abs().idxmin()]
@@ -732,7 +736,7 @@ def calculate_t(df, type):
                                  (df['id'] == id) & (df['main_parameter'] == main_parameter), 'phase_90'] = y_dx
                     df.loc[(df['secondary'] == secondary) & 
                                  (df['id'] == id) & (df['main_parameter'] == main_parameter), 'time_90-10'] = x_dx
-        df = df.drop(columns=['x', 'y']).drop_duplicates().reset_index(drop=True)
+        #df = df.drop(columns=['x', 'y']).drop_duplicates().reset_index(drop=True)
         for col in ['phase_max', 'phase_90', 'time_90-10']:
             df[col] = pd.to_numeric(df[col], errors='coerce').round(3)
 
@@ -741,15 +745,111 @@ def calculate_t(df, type):
         #param_name = df['param_name'][0].astype(str)
         df = df.drop(columns=['primary', 'param_name']).drop_duplicates().reset_index(drop=True)
         df = df.rename(columns={'secondary': 'time_type'})
-        df = df.reindex(columns = ['id', 'exp_n', 'main_parameter', 'time_type', 'phase_max', 'phase_90', 'time_90-10'])
+        df['t_type'] = df['time_type'].str.extract(r'(TRise|TFall)')
+        df[['v1', 'v2']] = df['time_type'].str.extract(r'([\d\.]+)-([\d\.]+)').astype(float)
+        df['voltage'] = df.apply(lambda x: x['v2'] if x['t_type'] == 'TRise' else x['v1'], axis=1)
+        df = df.drop(columns=['time_type', 'v1', 'v2'])
+        df = df.reindex(columns = ['id', 'exp_n', 'main_parameter', 't_type', 'voltage', 'phase_max', 'phase_90', 'time_90-10', 'x', 'y'])
+        df = df.sort_values(by=['voltage'])
+        df['voltage'] *= 4
         #print('\nMain parameter: ' + param_name)
-        for type in df['time_type'].str[:5].unique():
+        for type in df['t_type'].str[:5].unique():
             sheet_name = f"{type}"
+            sheet_names.append(sheet_name)
             ws = wb.create_sheet(title=sheet_name)
-            filtered_df = df[df['time_type'].str[:5] == type].reset_index(drop=True)
+            filtered_df = df[df['t_type'].str[:5] == type].reset_index(drop=True)
+            filtered_df_copy = filtered_df.copy()
+            filtered_df = filtered_df.drop(columns=['x', 'y']).drop_duplicates().reset_index(drop=True)
             for row in dataframe_to_rows(filtered_df, index=False, header=True):
                 ws.append(row)
+            start_col = len(filtered_df.columns) + 2
+            start_row = 1
+            unique_ids = filtered_df_copy['id'].unique()
             
+            col_position = start_col
+            for series_id in unique_ids:
+                ws.cell(row=start_row, column=col_position, value=f"ID {series_id} - X")  # X column header
+                ws.cell(row=start_row, column=col_position+1, value=f"ID {series_id} - Y")  # Y column header
+                col_position += 2  # Move to next pair of columns
+            
+            max_rows = filtered_df_copy.groupby("id").size().max()  # Find max rows needed per ID
+            filtered_df_copy = filtered_df_copy.sort_values(by=['x']).groupby("id")
+            
+            for row_index in range(max_rows):  # Iterate over the maximum row count
+                col_position = start_col
+                for series_id in unique_ids:
+                    series_data = filtered_df_copy.get_group(series_id).reset_index(drop=True)  # Data for specific ID
+                    if row_index < len(series_data):  # If row exists in this ID's data
+                        ws.cell(row=start_row + 1 + row_index, column=col_position, value=series_data.loc[row_index, 'x'])
+                        ws.cell(row=start_row + 1 + row_index, column=col_position+1, value=series_data.loc[row_index, 'y'])
+                    col_position += 2  # Move to next ID's column pair
+            
+
+            chart = ScatterChart()
+            chart.title = "Raw data"
+            chart.x_axis.title = "Time, s"
+            chart.y_axis.title = "Phase, deg"
+            chart.x_axis.majorGridlines = ChartLines()
+            chart.y_axis.majorGridlines = ChartLines()
+            chart.x_axis.delete = False
+            chart.y_axis.delete = False
+
+            # Add series for each unique ID
+            col_position = start_col
+            for series_id in unique_ids:
+                title = filtered_df[filtered_df['id'] == series_id]['voltage'].iloc[0]
+                x_values = Reference(ws, min_col=col_position, min_row=2, max_row=start_row + max_rows)
+                y_values = Reference(ws, min_col=col_position+1, min_row=2, max_row=start_row + max_rows)
+                series = Series(y_values, x_values, title=f"{title} V")
+                series.smooth = False
+                chart.series.append(series)
+                col_position += 2  # Move to the next pair of columns
+
+            # Position chart at J1
+            chart.varyColors = False
+            ws.add_chart(chart, "J1")
+            
+        
+        ws = wb.create_sheet(title='descriptor')
+        
+        
+        def create_chart(df, x, y, sheet_names, cell):
+            for sheet_name in sheet_names:
+                x_title = str(df.columns[x])
+                y_title = str(df.columns[y])
+                chart = ScatterChart()
+                chart.x_axis.title = x_title
+                chart.y_axis.title = y_title
+                    
+                chart.title = y_title + " vs " + x_title
+                
+                #chart.x_axis.scaling.min = round(filtered_df['x'].min())
+                #chart.y_axis.scaling.min = round(-filtered_df['avg_y'].max())
+                #chart.x_axis.scaling.max = round(filtered_df['x'].max())
+                #chart.y_axis.scaling.max = round(-filtered_df['avg_y'].min())
+                
+                chart.x_axis.majorGridlines = ChartLines()
+                chart.y_axis.majorGridlines = ChartLines()
+                chart.x_axis.delete = False
+                chart.y_axis.delete = False
+                #try:
+                #    main_parameters = sorted(main_parameters, key=custom_sort_key)
+                #except:
+                #    None
+
+                # Loop through each unique main_parameter and add a series to the chart
+                x_values = Reference(wb[sheet_name], min_col=x+1, min_row=2, max_row=20)
+                y_values = Reference(wb[sheet_name], min_col=y+1, min_row=2, max_row=20)
+                series = Series(y_values, x_values, title=sheet_name)
+                series.smooth = False
+                chart.series.append(series)
+
+                # Place the chart below the data table
+                chart.varyColors = False
+                ws.add_chart(chart, cell)
+        
+        create_chart(df, 4, 7, sheet_names, 'A1')
+        create_chart(df, 4, 5, sheet_names, 'J1')
 
 # Main execution
 if __name__ == "__main__":
