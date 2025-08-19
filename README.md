@@ -4,7 +4,7 @@
 A simplified verson of main script, focused on processing company's existing data format for phase and magnitude.
 
 ### Phase data
-- Takes excel data files, wich a specific name where underscore is a separator:
+- Takes excel data files, with a specific name where underscore is a separator:
   
   *gleb 14-08-25_Phase Shifter_MP TTM 0523 MERCK 001_Response_Time_PHASE_TFall_20-0V_2025-08-14_10-15-48.xlsx*, "Response_Time_PHASE_" is always skipped
   
