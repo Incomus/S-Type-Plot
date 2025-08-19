@@ -52,4 +52,4 @@ A simplified verson of main script, focused on processing company's existing dat
   
   E. E1 is expected to be "Test Parameters:" and E2 is a text that is used to determine  "antenna type" and a "comment" in the same way as phase, e.g. "RX +10deg az"
   
-- Script outputs an excel pivot table with columns: antenna (experiment name), comment, antenna type (RX/TX), voltage, id (to do: replace by date of test), data is then presented as a frequency data being column headers and magnitude data being values.
+- Script outputs an excel pivot table with columns: antenna (experiment name), comment, antenna type (RX/TX), voltage, id (to do: replace id by date of test), data is then presented as a frequency data being column headers and magnitude data being values.
