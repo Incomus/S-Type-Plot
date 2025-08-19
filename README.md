@@ -7,12 +7,16 @@ A simplified verson of main script, focused on processing company's existing dat
 - Takes excel data files, wich a specific name where underscore is a separator:
   
   *gleb 14-08-25_Phase Shifter_MP TTM 0523 MERCK 001_Response_Time_PHASE_TFall_20-0V_2025-08-14_10-15-48.xlsx*, "Response_Time_PHASE_" is always skipped
+  
   *folder name_ps/antenna_experiment name_t type_voltage_date_time*
+  
   Currently, folder name, ps/antenna, voltage, date and time are not used and are dropped
 - Antenna type is extracted from file contents, see below.
 - Currently, data is expected to be symmetrical, where for every unique combination of experiment name (antenna name) and antenna type, there exist a measurement of TRise and TFall
 - Data is taken after processing by unwrapper script:
+  
   Data is expected in following columns with headers:
+  
   A. Frequency in GHz, where phase was recorded, every row is the same value, not currently used
   B. Unprocessed time data in s, left as is
   C. Unprocessed phase data in deg, left as is
