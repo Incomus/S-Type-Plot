@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import datetime
 import traceback
 import re
+from xlsxwriter import Workbook as Workbook_xw
 from openpyxl import Workbook, load_workbook
 from openpyxl.chart import ScatterChart, Reference, Series
 from openpyxl.chart.axis import ChartLines
@@ -80,8 +81,13 @@ def preprocess(main_folder_path, process_type):
         try:
             df = pd.read_excel(file)
             file = file.stem
-            if 'Response_Time' not in file:
-                continue
+            if process_type == 'magnitude':
+                if 'Response_Time' in file:
+                    continue
+            elif process_type == 'phase':
+                if 'Response_Time' not in file:
+                    continue
+                
             file = file.replace("Response_Time_PHASE_", "") # .replace("TFall_", "TFall ").replace("TRise_", "TRise ")
             type = ''
             desc = ''
@@ -270,7 +276,7 @@ def phase_to_excel(df):
     
 def mag_to_excel(data_df):
     file_name = input("Input excel file name\n") + ".xlsx"
-    wb = Workbook(file_name)
+    wb = Workbook_xw(file_name)
     for ant_type in data_df['ant_type'].unique():
         df = data_df[data_df['ant_type'] == ant_type].sort_values(by='id').dropna(axis=1, how='all')
         ws = wb.add_worksheet(ant_type)
