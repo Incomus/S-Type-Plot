@@ -36,7 +36,7 @@ A simplified verson of main script, focused on processing company's existing dat
   It also displays and draws data for processed data of the curves themselves.
 
 ### Magnitude data
-- Takes excel data files, wich a specific name where underscore is a separator:
+- Takes excel data files, with a specific name where underscore is a separator:
   
   *gleb 14-08-25_Phase Shifter_MP TTM 0523 MERCK 002_S12_LOGM_0V_2025-08-14_11-29-22.xlsx*
   
